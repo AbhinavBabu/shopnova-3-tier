@@ -1,0 +1,72 @@
+# ── Namespace ──────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.namespace }}
+  labels:
+    environment: production
+    app: shopnova
+---
+# ── Application ConfigMap (non-sensitive config) ───────────────────────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shopnova-config
+  namespace: {{ .Values.namespace }}
+data:
+  NODE_ENV: {{ .Values.config.NODE_ENV | quote }}
+  AUTH_PORT: {{ .Values.config.AUTH_PORT | quote }}
+  PRODUCT_PORT: {{ .Values.config.PRODUCT_PORT | quote }}
+  ORDER_PORT: {{ .Values.config.ORDER_PORT | quote }}
+  NOTIFICATION_PORT: {{ .Values.config.NOTIFICATION_PORT | quote }}
+  FRONTEND_PORT: {{ .Values.config.FRONTEND_PORT | quote }}
+  NOTIFICATION_SERVICE_HOST: {{ .Values.config.NOTIFICATION_SERVICE_HOST | quote }}
+  NOTIFICATION_SERVICE_PORT: {{ .Values.config.NOTIFICATION_SERVICE_PORT | quote }}
+---
+# ── Nginx ConfigMap (static-file-only config, no proxy_pass) ──────────────────
+# ALB Ingress handles all /api/* routing. Nginx only serves the React SPA.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: {{ .Values.namespace }}
+data:
+  default.conf: |
+    server {
+        listen 3000;
+        server_name localhost;
+
+        root /usr/share/nginx/html;
+        index index.html;
+
+        # SPA fallback for React Router
+        location / {
+            try_files $uri $uri/ /index.html;
+        }
+
+        # Cache static assets aggressively
+        location ~* \.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+
+        gzip on;
+        gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
+    }
+---
+# ── Secret (sensitive credentials — override values at deploy time) ────────────
+# WARNING: Never commit real secret values to Git.
+# Use: helm install shopnova-config ./helm/shopnova-config --set secrets.JWT_SECRET=... etc.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: shopnova-secrets
+  namespace: {{ .Values.namespace }}
+type: Opaque
+stringData:
+  AUTH_MONGO_URI: {{ .Values.secrets.AUTH_MONGO_URI | quote }}
+  PRODUCT_MONGO_URI: {{ .Values.secrets.PRODUCT_MONGO_URI | quote }}
+  ORDER_MONGO_URI: {{ .Values.secrets.ORDER_MONGO_URI | quote }}
+  JWT_SECRET: {{ .Values.secrets.JWT_SECRET | quote }}
+  EMAIL_USER: {{ .Values.secrets.EMAIL_USER | quote }}
+  EMAIL_PASS: {{ .Values.secrets.EMAIL_PASS | quote }}

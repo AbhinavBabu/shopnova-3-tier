@@ -1,0 +1,135 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# ShopNova — Local Docker Compose (for testing only)
+#
+# Mirrors the EKS architecture:
+#   frontend (nginx, port 3000) → proxies /api/* → backend services
+#   order-service               → calls notification-service internally
+#   All backend services        → share a local MongoDB instance
+#
+# Usage:
+#   1. Copy .env.example to .env and fill in values
+#   2. docker compose up --build
+#   3. Open http://localhost:3000
+# ──────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── MongoDB (local stand-in for Atlas) ──────────────────────────────────────
+  mongo:
+    image: mongo:7
+    container_name: shopnova-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - shopnova-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Auth Service (port 8001) ─────────────────────────────────────────────────
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+    container_name: shopnova-auth
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      PORT: "8001"
+      AUTH_MONGO_URI: ${AUTH_MONGO_URI:-mongodb://mongo:27017/authdb}
+      JWT_SECRET: ${JWT_SECRET:-local_dev_jwt_secret_change_me}
+    networks:
+      - shopnova-net
+    # Not exposed to host — frontend nginx proxies to it internally
+
+  # ── Product Service (port 8002) ──────────────────────────────────────────────
+  product-service:
+    build:
+      context: ./services/product-service
+      dockerfile: Dockerfile
+    container_name: shopnova-product
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      PORT: "8002"
+      PRODUCT_MONGO_URI: ${PRODUCT_MONGO_URI:-mongodb://mongo:27017/productdb}
+      JWT_SECRET: ${JWT_SECRET:-local_dev_jwt_secret_change_me}
+    networks:
+      - shopnova-net
+
+  # ── Order Service (port 8003) ────────────────────────────────────────────────
+  order-service:
+    build:
+      context: ./services/order-service
+      dockerfile: Dockerfile
+    container_name: shopnova-order
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+      notification-service:
+        condition: service_started
+    environment:
+      NODE_ENV: development
+      PORT: "8003"
+      ORDER_MONGO_URI: ${ORDER_MONGO_URI:-mongodb://mongo:27017/orderdb}
+      JWT_SECRET: ${JWT_SECRET:-local_dev_jwt_secret_change_me}
+      # Internal service discovery — mirrors K8s DNS names
+      NOTIFICATION_SERVICE_HOST: notification-service
+      NOTIFICATION_SERVICE_PORT: "8004"
+    networks:
+      - shopnova-net
+
+  # ── Notification Service (port 8004) ────────────────────────────────────────
+  # Internal only — not reachable from the host (no ports: mapping)
+  notification-service:
+    build:
+      context: ./services/notification-service
+      dockerfile: Dockerfile
+    container_name: shopnova-notification
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: "8004"
+      EMAIL_USER: ${EMAIL_USER:-test@example.com}
+      EMAIL_PASS: ${EMAIL_PASS:-changeme}
+    networks:
+      - shopnova-net
+
+  # ── Frontend / nginx (port 3000) ─────────────────────────────────────────────
+  # Serves the React SPA and reverse-proxies /api/* to backend services
+  # (uses the same nginx.conf that the Docker-Compose note in the Dockerfile mentions)
+  frontend-service:
+    build:
+      context: ./services/frontend-service
+      dockerfile: Dockerfile
+    container_name: shopnova-frontend
+    restart: unless-stopped
+    depends_on:
+      - auth-service
+      - product-service
+      - order-service
+    ports:
+      - "3000:3000"
+    networks:
+      - shopnova-net
+
+# ── Shared network (Docker DNS resolves service names) ───────────────────────
+networks:
+  shopnova-net:
+    driver: bridge
+
+# ── Persistent MongoDB data volume ───────────────────────────────────────────
+volumes:
+  mongo-data:

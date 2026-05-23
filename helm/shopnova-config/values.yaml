@@ -1,0 +1,29 @@
+# shopnova-config/values.yaml
+# Non-sensitive cluster-wide configuration shared across all services.
+# Sensitive values (Mongo URIs, JWT secret, email creds) are supplied at
+# deploy time via --set or a separate secrets.yaml that is NOT committed to Git.
+
+namespace: prod
+
+config:
+  NODE_ENV: "production"
+  AUTH_PORT: "8001"
+  PRODUCT_PORT: "8002"
+  ORDER_PORT: "8003"
+  NOTIFICATION_PORT: "8004"
+  FRONTEND_PORT: "3000"
+  NOTIFICATION_SERVICE_HOST: "notification-service"
+  NOTIFICATION_SERVICE_PORT: "8004"
+
+# ── Secret values (override at deploy time, do NOT commit real values) ────────
+# Pass these via:
+#   helm install shopnova-config ./helm/shopnova-config \
+#     --set secrets.AUTH_MONGO_URI="mongodb+srv://..." \
+#     --set secrets.JWT_SECRET="mysecret" ...
+secrets:
+  AUTH_MONGO_URI: "REPLACE_ME"
+  PRODUCT_MONGO_URI: "REPLACE_ME"
+  ORDER_MONGO_URI: "REPLACE_ME"
+  JWT_SECRET: "REPLACE_ME"
+  EMAIL_USER: "REPLACE_ME"
+  EMAIL_PASS: "REPLACE_ME"

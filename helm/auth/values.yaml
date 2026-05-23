@@ -1,0 +1,25 @@
+# Auth Service — values.yaml
+namespace: prod
+
+image:
+  repository: abhinavbabu33/shopnova-auth-service
+  tag: latest
+  pullPolicy: Always
+
+replicaCount: 1
+
+port: 8001
+
+resources:
+  requests:
+    cpu: 128m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Environment — non-sensitive (sourced from ConfigMap)
+env:
+  nodeEnv: production
+  configMapName: shopnova-config
+  secretName: shopnova-secrets

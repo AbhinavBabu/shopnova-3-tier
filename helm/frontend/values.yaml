@@ -1,0 +1,23 @@
+# Frontend Service — values.yaml
+# Nginx serves static React build; ALB Ingress handles external routing
+namespace: prod
+
+image:
+  repository: abhinavbabu33/shopnova-frontend
+  tag: latest
+  pullPolicy: Always
+
+replicaCount: 1
+
+port: 3000
+
+resources:
+  requests:
+    cpu: 64m
+    memory: 64Mi
+  limits:
+    cpu: 250m
+    memory: 128Mi
+
+# nginx ConfigMap name (mounted as default.conf)
+nginxConfigMap: nginx-config

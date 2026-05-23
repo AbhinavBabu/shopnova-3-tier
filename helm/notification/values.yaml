@@ -1,0 +1,25 @@
+# Notification Service — values.yaml
+# Single replica — best-effort email/event service (no HPA needed)
+namespace: prod
+
+image:
+  repository: abhinavbabu33/shopnova-notification-service
+  tag: latest
+  pullPolicy: Always
+
+replicaCount: 1
+
+port: 8004
+
+resources:
+  requests:
+    cpu: 64m
+    memory: 128Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi
+
+# Environment — non-sensitive (sourced from ConfigMap)
+env:
+  configMapName: shopnova-config
+  secretName: shopnova-secrets
