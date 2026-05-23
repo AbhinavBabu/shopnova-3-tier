@@ -1,21 +1,13 @@
-# Ingress — values.yaml
-# AWS Application Load Balancer (ALB) via AWS Load Balancer Controller
 namespace: prod
 
-# ALB scheme: internet-facing or internal
 scheme: internet-facing
 
-# ALB target type: ip (required for Fargate / pod-level routing)
 targetType: ip
 
-# Certificate ARN — replace with your ACM certificate ARN if using HTTPS
-# certificateArn: "arn:aws:acm:us-east-1:123456789012:certificate/xxxx"
-
-# Routing rules
 routes:
   frontend:
     serviceName: frontend-service
-    servicePort: 3000
+    servicePort: 8080
     path: /
   auth:
     serviceName: auth-service

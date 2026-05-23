@@ -1,9 +1,7 @@
-# Notification Service — values.yaml
-# Single replica — best-effort email/event service (no HPA needed)
 namespace: prod
 
 image:
-  repository: abhinavbabu33/shopnova-notification-service
+  repository: abhinavbabu33/new-shopnova-notification
   tag: latest
   pullPolicy: Always
 
@@ -19,7 +17,6 @@ resources:
     cpu: 250m
     memory: 256Mi
 
-# Environment — non-sensitive (sourced from ConfigMap)
 env:
   configMapName: shopnova-config
   secretName: shopnova-secrets

@@ -1,0 +1,41 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: shopnova-eks
+  region: us-east-1
+  version: "1.32"
+
+iam:
+  withOIDC: true
+
+managedNodeGroups:
+  - name: shopnova-nodes
+    privateNetworking: true
+    instanceType: t3a.medium
+    minSize: 1
+    maxSize: 2
+    desiredCapacity: 1
+    volumeSize: 30
+    volumeType: gp3
+    iam:
+      attachPolicyARNs:
+        - arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy
+        - arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy
+        - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+    tags:
+      kubernetes.io/cluster/shopnova-eks: owned
+
+vpc:
+  subnets:
+    public:
+      public-1:
+        id: subnet-092f5e95f583582d5
+      public-2:
+        id: subnet-07dfe58bf13378ab2
+
+    private:
+      app-1:
+        id: subnet-0cbce13f39e76627d
+      app-2:
+        id: subnet-0d55dd972c9df325b

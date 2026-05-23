@@ -1,8 +1,7 @@
-# Order Service — values.yaml
 namespace: prod
 
 image:
-  repository: abhinavbabu33/shopnova-order-service
+  repository: abhinavbabu33/new-shopnova-order
   tag: latest
   pullPolicy: Always
 
@@ -18,11 +17,9 @@ resources:
     cpu: 500m
     memory: 512Mi
 
-# Environment — non-sensitive (sourced from ConfigMap)
 env:
   nodeEnv: production
   configMapName: shopnova-config
   secretName: shopnova-secrets
-  # Internal K8s DNS for service-to-service communication
   notificationServiceHost: notification-service
   notificationServicePort: "8004"

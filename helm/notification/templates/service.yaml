@@ -12,5 +12,4 @@ spec:
     - protocol: TCP
       port: {{ .Values.port }}
       targetPort: {{ .Values.port }}
-  # ClusterIP only — internal service-to-service communication, not exposed via ALB
   type: ClusterIP

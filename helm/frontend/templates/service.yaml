@@ -12,5 +12,4 @@ spec:
     - protocol: TCP
       port: {{ .Values.port }}
       targetPort: {{ .Values.port }}
-  # ClusterIP — ALB Ingress forwards external traffic to this service
   type: ClusterIP

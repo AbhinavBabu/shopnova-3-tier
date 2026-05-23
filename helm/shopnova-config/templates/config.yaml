@@ -1,4 +1,3 @@
-# ── Namespace ──────────────────────────────────────────────────────────────────
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -7,7 +6,6 @@ metadata:
     environment: production
     app: shopnova
 ---
-# ── Application ConfigMap (non-sensitive config) ───────────────────────────────
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -23,8 +21,6 @@ data:
   NOTIFICATION_SERVICE_HOST: {{ .Values.config.NOTIFICATION_SERVICE_HOST | quote }}
   NOTIFICATION_SERVICE_PORT: {{ .Values.config.NOTIFICATION_SERVICE_PORT | quote }}
 ---
-# ── Nginx ConfigMap (static-file-only config, no proxy_pass) ──────────────────
-# ALB Ingress handles all /api/* routing. Nginx only serves the React SPA.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -33,18 +29,16 @@ metadata:
 data:
   default.conf: |
     server {
-        listen 3000;
+        listen 8080;
         server_name localhost;
 
         root /usr/share/nginx/html;
         index index.html;
 
-        # SPA fallback for React Router
         location / {
             try_files $uri $uri/ /index.html;
         }
 
-        # Cache static assets aggressively
         location ~* \.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2)$ {
             expires 1y;
             add_header Cache-Control "public, immutable";
@@ -54,9 +48,6 @@ data:
         gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
     }
 ---
-# ── Secret (sensitive credentials — override values at deploy time) ────────────
-# WARNING: Never commit real secret values to Git.
-# Use: helm install shopnova-config ./helm/shopnova-config --set secrets.JWT_SECRET=... etc.
 apiVersion: v1
 kind: Secret
 metadata:

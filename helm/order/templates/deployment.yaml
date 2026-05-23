@@ -46,7 +46,6 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.env.secretName }}
                   key: JWT_SECRET
-            # Internal K8s DNS — notification-service resolves within the same namespace
             - name: NOTIFICATION_SERVICE_HOST
               value: {{ .Values.env.notificationServiceHost }}
             - name: NOTIFICATION_SERVICE_PORT
