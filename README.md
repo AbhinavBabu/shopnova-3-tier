@@ -1,217 +1,186 @@
-# ShopNova — Simplified EKS Deployment
+# ShopNova — EKS Deployment
 
-> **Stack**: Amazon EKS · AWS Load Balancer Controller (ALB) · Helm · Kubernetes Ingress (`networking.k8s.io/v1`)
-> **No**: Gateway API · KGateway · ArgoCD · Argo Rollouts · Sealed Secrets · Istio · Service Mesh
+> **Stack**: Amazon EKS · AWS Load Balancer Controller · Helm · Amazon SQS · MongoDB (StatefulSet)
+
+A production-ready microservices deployment for the ShopNova e-commerce platform on AWS.
 
 ---
 
-## Architecture Overview
+## Repository Structure
+
+```
+shopnova-deployment/
+├── services/                    # Application source code
+│   ├── auth-service/
+│   ├── product-service/
+│   ├── order-service/
+│   ├── notification-service/
+│   └── frontend-service/
+│
+├── helm/                        # Helm charts (one per service)
+│   ├── shopnova-config/         # Shared Namespace + ConfigMap
+│   ├── auth/
+│   ├── product/
+│   ├── order/
+│   ├── notification/
+│   ├── frontend/
+│   └── ingress/
+│
+├── k8s/                         # Raw Kubernetes manifests
+│   ├── storageclass.yaml        # EBS StorageClass for MongoDB
+│   ├── mongo-statefulset.yaml   # MongoDB StatefulSet + headless Service
+│   └── secrets.yaml             # Secret template (sanitized — fill locally)
+│
+├── scripts/
+│   ├── deploy.sh                # One-shot deploy to EKS
+│   └── destroy.sh               # Teardown all Helm releases
+│
+├── docs/
+│   └── architecture.md          # System architecture overview
+│
+├── eks-cluster.yaml             # eksctl cluster definition
+├── docker-compose.yml           # Local development only
+├── iam-policy.json              # IAM policy for AWS Load Balancer Controller
+├── .env.example                 # Environment variable reference
+└── .gitignore
+```
+
+---
+
+## Architecture
 
 ```
 Internet
    │
    ▼
-AWS ALB  (internet-facing, provisioned by AWS Load Balancer Controller)
+AWS ALB  (internet-facing)
    │
-   ├── /api/auth      → auth-service:8001      (ClusterIP)
-   ├── /api/products  → product-service:8002   (ClusterIP)
-   ├── /api/orders    → order-service:8003     (ClusterIP)
-   └── /              → frontend-service:3000  (ClusterIP, catch-all)
-                             │
-                             ▼
-                         nginx (React SPA)
-                         static files only
+   ├── /api/auth      → auth-service:8001
+   ├── /api/products  → product-service:8002
+   ├── /api/orders    → order-service:8003
+   └── /              → frontend-service:3000  (React SPA / nginx)
 
-order-service  ──────────────────────────────►  notification-service:8004
-               (internal K8s DNS, not via ALB)  (ClusterIP, no external exposure)
+order-service ──► Amazon SQS ──► notification-service:8004
+              (async, decoupled)   (internal ClusterIP, email via Gmail SMTP)
 ```
 
-## Port Map
-
-| Service              | Container Port |
-|----------------------|---------------|
-| auth-service         | 8001          |
-| product-service      | 8002          |
-| order-service        | 8003          |
-| notification-service | 8004          |
-| frontend (nginx)     | 3000          |
-
----
-
-## Folder Structure
-
-```
-shopnova-deployment/
-├── deploy.sh                      # One-shot deploy script
-├── destroy.sh                     # Teardown script
-└── helm/
-    ├── shopnova-config/           # Shared prerequisites (Namespace, ConfigMap, Secret)
-    │   ├── Chart.yaml
-    │   ├── values.yaml
-    │   └── templates/
-    │       └── config.yaml
-    ├── auth/
-    │   ├── Chart.yaml
-    │   ├── values.yaml
-    │   └── templates/
-    │       ├── deployment.yaml
-    │       └── service.yaml
-    ├── product/
-    │   ├── Chart.yaml
-    │   ├── values.yaml
-    │   └── templates/
-    │       ├── deployment.yaml
-    │       └── service.yaml
-    ├── order/
-    │   ├── Chart.yaml
-    │   ├── values.yaml
-    │   └── templates/
-    │       ├── deployment.yaml
-    │       └── service.yaml
-    ├── notification/
-    │   ├── Chart.yaml
-    │   ├── values.yaml
-    │   └── templates/
-    │       ├── deployment.yaml
-    │       └── service.yaml
-    ├── frontend/
-    │   ├── Chart.yaml
-    │   ├── values.yaml
-    │   └── templates/
-    │       ├── deployment.yaml
-    │       └── service.yaml
-    └── ingress/
-        ├── Chart.yaml
-        ├── values.yaml
-        └── templates/
-            └── ingress.yaml
-```
+See [docs/architecture.md](docs/architecture.md) for full details.
 
 ---
 
 ## Prerequisites
 
-### 1. AWS Load Balancer Controller
-
-The AWS Load Balancer Controller must be installed in your EKS cluster **before** deploying the ingress chart.
-
-```bash
-# Add the EKS Helm repo
-helm repo add eks https://aws.github.io/eks-charts
-helm repo update
-
-# Install the controller (replace <CLUSTER_NAME> and <REGION>)
-helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
-  -n kube-system \
-  --set clusterName=<CLUSTER_NAME> \
-  --set serviceAccount.create=false \
-  --set serviceAccount.name=aws-load-balancer-controller
-```
-
-> The controller requires an IAM role with the `AWSLoadBalancerControllerIAMPolicy` attached.
-> See: https://docs.aws.amazon.com/eks/latest/userguide/aws-load-balancer-controller.html
+1. An EKS cluster — create one with:
+   ```bash
+   eksctl create cluster -f eks-cluster.yaml
+   ```
+2. AWS Load Balancer Controller installed in the cluster
+3. `kubectl` configured against the cluster
+4. `helm` v3+
 
 ---
 
-## Deploying ShopNova
+## Deploying
 
-### Option A — One-shot script
+### Step 1 — Fill in secrets
 
-```bash
-# Export your real secrets as environment variables first
-export AUTH_MONGO_URI="mongodb+srv://user:pass@cluster.mongodb.net/authdb"
-export PRODUCT_MONGO_URI="mongodb+srv://user:pass@cluster.mongodb.net/productdb"
-export ORDER_MONGO_URI="mongodb+srv://user:pass@cluster.mongodb.net/orderdb"
-export JWT_SECRET="your-super-secret-jwt-key"
-export EMAIL_USER="noreply@shopnova.com"
-export EMAIL_PASS="your-smtp-password"
+Edit `k8s/secrets.yaml` locally (it is gitignored — never commit real values):
 
-bash deploy.sh
+```yaml
+stringData:
+  AUTH_MONGO_URI: "mongodb://mongo:27017/authdb"
+  PRODUCT_MONGO_URI: "mongodb://mongo:27017/productdb"
+  ORDER_MONGO_URI: "mongodb://mongo:27017/orderdb"
+  JWT_SECRET: "your-jwt-secret"
+  EMAIL_USER: "your@gmail.com"
+  EMAIL_PASS: "your-app-password"
+  SQS_QUEUE_URL: "https://sqs.us-east-1.amazonaws.com/<account>/<queue>"
 ```
 
-### Option B — Install charts individually
+### Step 2 — Deploy everything
+
+```bash
+bash scripts/deploy.sh
+```
+
+The script applies the StorageClass, MongoDB StatefulSet, secrets, and all Helm charts in order.
+
+### Manual deployment
 
 ```bash
 NAMESPACE=prod
 
-# 1. Shared config, ConfigMaps, and Secrets
+# Shared prerequisites (Namespace + ConfigMap)
 helm upgrade --install shopnova-config ./helm/shopnova-config \
-  --namespace $NAMESPACE --create-namespace \
-  --set secrets.AUTH_MONGO_URI="..." \
-  --set secrets.PRODUCT_MONGO_URI="..." \
-  --set secrets.ORDER_MONGO_URI="..." \
-  --set secrets.JWT_SECRET="..." \
-  --set secrets.EMAIL_USER="..." \
-  --set secrets.EMAIL_PASS="..."
+  --namespace $NAMESPACE --create-namespace
 
-# 2. Backend services
-helm upgrade --install auth        ./helm/auth        -n $NAMESPACE
-helm upgrade --install product     ./helm/product     -n $NAMESPACE
-helm upgrade --install order       ./helm/order       -n $NAMESPACE
+# Kubernetes manifests
+kubectl apply -f k8s/storageclass.yaml
+kubectl apply -f k8s/mongo-statefulset.yaml
+kubectl apply -f k8s/secrets.yaml      # fill real values first
+
+# Services
+helm upgrade --install auth         ./helm/auth         -n $NAMESPACE
+helm upgrade --install product      ./helm/product      -n $NAMESPACE
+helm upgrade --install order        ./helm/order        -n $NAMESPACE
 helm upgrade --install notification ./helm/notification -n $NAMESPACE
-
-# 3. Frontend
-helm upgrade --install frontend    ./helm/frontend    -n $NAMESPACE
-
-# 4. ALB Ingress (deploy last — backend services must exist first)
-helm upgrade --install ingress     ./helm/ingress     -n $NAMESPACE
+helm upgrade --install frontend     ./helm/frontend     -n $NAMESPACE
+helm upgrade --install ingress      ./helm/ingress      -n $NAMESPACE
 ```
 
 ---
 
 ## Accessing the Application
 
-After the ingress chart is deployed, the ALB typically takes **1–2 minutes** to provision.
-
 ```bash
-# Get the ALB hostname
+# Get the ALB hostname (takes 1-2 minutes after ingress deploy)
 kubectl get ingress shopnova-alb-ingress -n prod \
   -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
 ```
 
-Open the hostname in your browser — it routes to the React frontend.
-
 ---
 
-## Updating an Image
-
-To roll out a new image tag for any service:
+## Updating a Service Image
 
 ```bash
-helm upgrade auth ./helm/auth -n prod \
-  --set image.tag=auth-service-v1.2.3
+helm upgrade order ./helm/order -n prod --set image.tag=v1.2.3
 ```
 
 ---
 
-## Enabling HTTPS (Production)
+## Enabling HTTPS
 
 1. Create an ACM certificate in your AWS account.
-2. Edit `helm/ingress/values.yaml`:
-   ```yaml
-   # certificateArn: "arn:aws:acm:us-east-1:123456789012:certificate/xxxx"
-   ```
-   Uncomment the line and set your ARN.
-3. In `helm/ingress/templates/ingress.yaml`, uncomment the HTTPS listen-ports annotation.
+2. Set the ARN in `helm/ingress/values.yaml`.
+3. Uncomment the HTTPS annotations in `helm/ingress/templates/ingress.yaml`.
 4. `helm upgrade ingress ./helm/ingress -n prod`
 
 ---
 
-## Tearing Down
+## Teardown
 
 ```bash
-bash destroy.sh
+bash scripts/destroy.sh
 ```
 
 ---
 
-## What Was Removed
+## Local Development
 
-| Removed Component     | Reason |
-|-----------------------|--------|
-| Gateway API / KGateway | Replaced by standard `networking.k8s.io/v1` Ingress + AWS ALB |
-| ArgoCD + Argo Rollouts | Replaced by simple `kubectl` / `helm upgrade` deploys |
-| Sealed Secrets        | Replaced by Helm `--set secrets.*` at deploy time |
-| Blue-green Rollouts   | Standard Kubernetes rolling update strategy |
-| Network Policies      | Can be re-added independently if needed |
-| HPA                   | Can be re-added independently if needed |
+```bash
+cp .env.example .env   # fill in values
+docker compose up --build
+# Open http://localhost:3000
+```
+
+---
+
+## Port Reference
+
+| Service              | Port |
+|----------------------|------|
+| auth-service         | 8001 |
+| product-service      | 8002 |
+| order-service        | 8003 |
+| notification-service | 8004 |
+| frontend (nginx)     | 3000 |

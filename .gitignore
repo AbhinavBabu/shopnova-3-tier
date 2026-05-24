@@ -2,7 +2,7 @@
 node_modules/
 npm-debug.log*
 
-# Environment files (keep .env.example, ignore actual .env)
+# Environment files — keep .env.example, ignore actual .env
 .env
 !.env.example
 
@@ -21,3 +21,13 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# AWS credentials / SSH keys
+*.pem
+*.key
+
+# Database dumps — never commit backup data
+mongo-backup/
+
+# Kubernetes secrets with real values — fill locally, never commit
+k8s/secrets.yaml
