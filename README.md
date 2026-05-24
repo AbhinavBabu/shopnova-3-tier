@@ -88,9 +88,9 @@ Edit `k8s/secrets.yaml` locally (it is gitignored — never commit real values):
 
 ```yaml
 stringData:
-  AUTH_MONGO_URI: "mongodb://mongo:27017/authdb"
-  PRODUCT_MONGO_URI: "mongodb://mongo:27017/productdb"
-  ORDER_MONGO_URI: "mongodb://mongo:27017/orderdb"
+  AUTH_MONGO_URI: "mongodb://****/authdb"
+  PRODUCT_MONGO_URI: "mongodb://****/productdb"
+  ORDER_MONGO_URI: "mongodb://****/orderdb"
   JWT_SECRET: "your-jwt-secret"
   EMAIL_USER: "your@gmail.com"
   EMAIL_PASS: "your-app-password"
