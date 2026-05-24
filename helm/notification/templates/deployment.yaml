@@ -15,6 +15,9 @@ spec:
       labels:
         app: notification-service
     spec:
+      # IAM Roles for Service Accounts (IRSA) — grants the pod permission to
+      # call SQS without storing AWS credentials in the environment.
+      serviceAccountName: sqs-access
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
@@ -41,6 +44,13 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.env.secretName }}
                   key: EMAIL_PASS
+            # SQS queue URL — polled by the notification-service to consume
+            # order-placed events sent by the order-service.
+            - name: SQS_QUEUE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.env.secretName }}
+                  key: SQS_QUEUE_URL
           resources:
             requests:
               cpu: {{ .Values.resources.requests.cpu }}

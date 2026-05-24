@@ -1,7 +1,7 @@
 namespace: prod
 
 image:
-  repository: abhinavbabu33/new-shopnova-order
+  repository: abhinavbabu33/new-shopnova-order-2
   tag: latest
   pullPolicy: Always
 
