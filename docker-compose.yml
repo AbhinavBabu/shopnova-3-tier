@@ -88,6 +88,9 @@ services:
       # Internal service discovery — mirrors K8s DNS names
       NOTIFICATION_SERVICE_HOST: notification-service
       NOTIFICATION_SERVICE_PORT: "8004"
+      # Amazon SQS — order-placed notification events
+      # Set SQS_QUEUE_URL in your .env file (see .env.example)
+      SQS_QUEUE_URL: ${SQS_QUEUE_URL:-}
     networks:
       - shopnova-net
 

@@ -61,3 +61,5 @@ stringData:
   JWT_SECRET: {{ .Values.secrets.JWT_SECRET | quote }}
   EMAIL_USER: {{ .Values.secrets.EMAIL_USER | quote }}
   EMAIL_PASS: {{ .Values.secrets.EMAIL_PASS | quote }}
+  # SQS queue URL for order-placed notification events (consumed by order-service)
+  SQS_QUEUE_URL: {{ .Values.secrets.SQS_QUEUE_URL | quote }}

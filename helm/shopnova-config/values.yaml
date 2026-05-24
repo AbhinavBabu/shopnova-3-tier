@@ -17,3 +17,6 @@ secrets:
   JWT_SECRET: "s8fK2#xP9Lm!qZr@8uV1bY"
   EMAIL_USER: ""
   EMAIL_PASS: ""
+  # Amazon SQS queue URL consumed by the order-service.
+  # Replace with the real URL before deploying to production.
+  SQS_QUEUE_URL: "https://sqs.us-east-1.amazonaws.com/692828329130/shopnova-notification-queue"

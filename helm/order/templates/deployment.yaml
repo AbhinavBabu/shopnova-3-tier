@@ -15,6 +15,7 @@ spec:
       labels:
         app: order-service
     spec:
+      serviceAccountName: sqs-access
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
@@ -50,6 +51,14 @@ spec:
               value: {{ .Values.env.notificationServiceHost }}
             - name: NOTIFICATION_SERVICE_PORT
               value: {{ .Values.env.notificationServicePort | quote }}
+            # Amazon SQS queue URL — used by the order-service to publish
+            # order-placed notification events instead of calling the
+            # notification-service REST API directly.
+            - name: SQS_QUEUE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.env.secretName }}
+                  key: SQS_QUEUE_URL
           resources:
             requests:
               cpu: {{ .Values.resources.requests.cpu }}
