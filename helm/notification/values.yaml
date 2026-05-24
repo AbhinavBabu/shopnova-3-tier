@@ -1,7 +1,7 @@
 namespace: prod
 
 image:
-  repository: abhinavbabu33/new-shopnova-notification
+  repository: abhinavbabu33/new-shopnova-notification-2
   tag: latest
   pullPolicy: Always
 

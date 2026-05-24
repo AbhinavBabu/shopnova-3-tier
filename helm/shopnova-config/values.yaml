@@ -10,13 +10,4 @@ config:
   NOTIFICATION_SERVICE_HOST: "notification-service"
   NOTIFICATION_SERVICE_PORT: "8004"
 
-secrets:
-  AUTH_MONGO_URI: "mongodb://10.0.30.207:27017/authdb"
-  PRODUCT_MONGO_URI: "mongodb://10.0.30.207:27017/productdb"
-  ORDER_MONGO_URI: "mongodb://10.0.30.207:27017/orderdb"
-  JWT_SECRET: "s8fK2#xP9Lm!qZr@8uV1bY"
-  EMAIL_USER: ""
-  EMAIL_PASS: ""
-  # Amazon SQS queue URL consumed by the order-service.
-  # Replace with the real URL before deploying to production.
-  SQS_QUEUE_URL: "https://sqs.us-east-1.amazonaws.com/692828329130/shopnova-notification-queue"
+secrets: {}

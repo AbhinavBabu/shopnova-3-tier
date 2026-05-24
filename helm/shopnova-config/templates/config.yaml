@@ -48,18 +48,7 @@ data:
         gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
     }
 ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: shopnova-secrets
-  namespace: {{ .Values.namespace }}
-type: Opaque
-stringData:
-  AUTH_MONGO_URI: {{ .Values.secrets.AUTH_MONGO_URI | quote }}
-  PRODUCT_MONGO_URI: {{ .Values.secrets.PRODUCT_MONGO_URI | quote }}
-  ORDER_MONGO_URI: {{ .Values.secrets.ORDER_MONGO_URI | quote }}
-  JWT_SECRET: {{ .Values.secrets.JWT_SECRET | quote }}
-  EMAIL_USER: {{ .Values.secrets.EMAIL_USER | quote }}
-  EMAIL_PASS: {{ .Values.secrets.EMAIL_PASS | quote }}
-  # SQS queue URL for order-placed notification events (consumed by order-service)
-  SQS_QUEUE_URL: {{ .Values.secrets.SQS_QUEUE_URL | quote }}
+# NOTE: shopnova-secrets is no longer managed by this Helm chart.
+# It is applied separately as a standalone manifest: k8s/secrets.yaml
+# All deployment templates continue to reference it by name via secretKeyRef —
+# no changes to those templates are required.
