@@ -1,10 +1,14 @@
 # ──────────────────────────────────────────────────────────────────────────────
-# ShopNova — Local Docker Compose (for testing only)
+# ShopNova — Local Docker Compose (all-in-one, for local development/testing)
 #
-# Mirrors the EKS architecture:
+# Mirrors the split-EC2 architecture locally:
 #   frontend (nginx, port 3000) → proxies /api/* → backend services
-#   order-service               → calls notification-service internally
+#   order-service               → calls notification-service via SQS
 #   All backend services        → share a local MongoDB instance
+#
+# For split-EC2 deployment, use:
+#   docker-compose.backend.yml  (backend EC2, private subnet)
+#   docker-compose.frontend.yml (frontend EC2, public subnet)
 #
 # Usage:
 #   1. Copy .env.example to .env and fill in values
@@ -44,6 +48,7 @@ services:
     environment:
       NODE_ENV: development
       PORT: "8001"
+      MONGO_HOST: mongo
       AUTH_MONGO_URI: ${AUTH_MONGO_URI:-mongodb://mongo:27017/authdb}
       JWT_SECRET: ${JWT_SECRET:-local_dev_jwt_secret_change_me}
     networks:
@@ -63,6 +68,7 @@ services:
     environment:
       NODE_ENV: development
       PORT: "8002"
+      MONGO_HOST: mongo
       PRODUCT_MONGO_URI: ${PRODUCT_MONGO_URI:-mongodb://mongo:27017/productdb}
       JWT_SECRET: ${JWT_SECRET:-local_dev_jwt_secret_change_me}
     networks:
@@ -83,14 +89,16 @@ services:
     environment:
       NODE_ENV: development
       PORT: "8003"
+      MONGO_HOST: mongo
       ORDER_MONGO_URI: ${ORDER_MONGO_URI:-mongodb://mongo:27017/orderdb}
       JWT_SECRET: ${JWT_SECRET:-local_dev_jwt_secret_change_me}
-      # Internal service discovery — mirrors K8s DNS names
+      # Internal service discovery (kept for reference — SQS is used in active code path)
       NOTIFICATION_SERVICE_HOST: notification-service
       NOTIFICATION_SERVICE_PORT: "8004"
       # Amazon SQS — order-placed notification events
       # Set SQS_QUEUE_URL in your .env file (see .env.example)
       SQS_QUEUE_URL: ${SQS_QUEUE_URL:-}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
     networks:
       - shopnova-net
 
@@ -125,6 +133,14 @@ services:
       - order-service
     ports:
       - "3000:3000"
+    environment:
+      # nginx.conf template substitution — Docker DNS names used here for local dev
+      AUTH_SERVICE_HOST: auth-service
+      AUTH_SERVICE_PORT: "8001"
+      PRODUCT_SERVICE_HOST: product-service
+      PRODUCT_SERVICE_PORT: "8002"
+      ORDER_SERVICE_HOST: order-service
+      ORDER_SERVICE_PORT: "8003"
     networks:
       - shopnova-net
 

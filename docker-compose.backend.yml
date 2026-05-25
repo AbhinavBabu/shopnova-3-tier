@@ -1,0 +1,112 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# ShopNova — Backend Docker Compose
+#
+# Deploy on the backend EC2 (private subnet).
+#
+# External dependencies (NOT managed here):
+#   • MongoDB  — runs on a separate DB EC2; set MONGO_HOST to its private IP.
+#   • Amazon SQS — set SQS_QUEUE_URL and AWS_REGION in .env.backend.
+#   • Email    — set EMAIL_USER / EMAIL_PASS in .env.backend.
+#
+# Usage:
+#   cp .env.backend .env.backend.local   # fill in real values
+#   docker compose -f docker-compose.backend.yml --env-file .env.backend.local up -d
+#
+# For local all-in-one testing (includes MongoDB and frontend):
+#   docker compose up --build
+# ──────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── Auth Service (port 8001) ─────────────────────────────────────────────────
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+    # Production alternative (pre-built image):
+    # image: abhinavbabu33/new-shopnova-auth:latest
+    container_name: shopnova-auth
+    restart: unless-stopped
+    ports:
+      - "8001:8001"   # exposed so the internal ALB target group can reach it
+    environment:
+      NODE_ENV: production
+      PORT: "8001"
+      # MONGO_HOST is used to construct mongodb://<MONGO_HOST>:27017/authdb
+      # Set this to the private IP / hostname of your MongoDB EC2.
+      # Optionally set AUTH_MONGO_URI to a full connection string (takes priority).
+      MONGO_HOST: ${MONGO_HOST}
+      AUTH_MONGO_URI: ${AUTH_MONGO_URI:-}
+      JWT_SECRET: ${JWT_SECRET}
+    networks:
+      - backend-net
+
+  # ── Product Service (port 8002) ──────────────────────────────────────────────
+  product-service:
+    build:
+      context: ./services/product-service
+      dockerfile: Dockerfile
+    # image: abhinavbabu33/new-shopnova-product:latest
+    container_name: shopnova-product
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    environment:
+      NODE_ENV: production
+      PORT: "8002"
+      MONGO_HOST: ${MONGO_HOST}
+      PRODUCT_MONGO_URI: ${PRODUCT_MONGO_URI:-}
+      JWT_SECRET: ${JWT_SECRET}
+    networks:
+      - backend-net
+
+  # ── Order Service (port 8003) ────────────────────────────────────────────────
+  order-service:
+    build:
+      context: ./services/order-service
+      dockerfile: Dockerfile
+    # image: abhinavbabu33/new-shopnova-order-2:latest
+    container_name: shopnova-order
+    restart: unless-stopped
+    ports:
+      - "8003:8003"
+    environment:
+      NODE_ENV: production
+      PORT: "8003"
+      MONGO_HOST: ${MONGO_HOST}
+      ORDER_MONGO_URI: ${ORDER_MONGO_URI:-}
+      JWT_SECRET: ${JWT_SECRET}
+      # Amazon SQS — order-placed events (active notification path)
+      SQS_QUEUE_URL: ${SQS_QUEUE_URL}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      # Legacy HTTP notification vars — not used in active code path (kept for reference)
+      NOTIFICATION_SERVICE_HOST: ${NOTIFICATION_SERVICE_HOST:-notification-service}
+      NOTIFICATION_SERVICE_PORT: ${NOTIFICATION_SERVICE_PORT:-8004}
+    networks:
+      - backend-net
+
+  # ── Notification Service (port 8004) ────────────────────────────────────────
+  # Internal only — not registered with the ALB; receives events via SQS polling.
+  notification-service:
+    build:
+      context: ./services/notification-service
+      dockerfile: Dockerfile
+    # image: abhinavbabu33/new-shopnova-notification-2:latest
+    container_name: shopnova-notification
+    restart: unless-stopped
+    # No ports: mapping — not reachable from the ALB or frontend.
+    # SQS polling (inside the container) is the only inbound channel.
+    environment:
+      NODE_ENV: production
+      PORT: "8004"
+      EMAIL_USER: ${EMAIL_USER}
+      EMAIL_PASS: ${EMAIL_PASS}
+      SQS_QUEUE_URL: ${SQS_QUEUE_URL}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+    networks:
+      - backend-net
+
+# ── Isolated bridge network for backend services ──────────────────────────────
+networks:
+  backend-net:
+    driver: bridge

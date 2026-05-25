@@ -5,7 +5,7 @@
 // order-service and sends a confirmation email for each one.
 //
 // Design notes:
-//   • One reusable SQSClient per process (region: us-east-1).
+//   • One reusable SQSClient per process (region from AWS_REGION env var, defaults to us-east-1).
 //   • Polls every POLL_INTERVAL_MS (default 5 000 ms) using a simple
 //     setTimeout loop so the event-loop stays free for HTTP requests.
 //   • Up to MAX_MESSAGES (5) messages are processed per poll cycle.
@@ -25,7 +25,7 @@ const {
 const createTransporter = require("./config/mailer");
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const REGION           = "us-east-1";
+const REGION           = process.env.AWS_REGION || "us-east-1";
 const MAX_MESSAGES     = 5;           // messages fetched per poll (1–10)
 const WAIT_TIME_SEC    = 5;           // SQS long-poll wait (seconds)
 const POLL_INTERVAL_MS = 5_000;       // delay between poll cycles (ms)

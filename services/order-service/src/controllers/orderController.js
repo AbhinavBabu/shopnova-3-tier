@@ -7,7 +7,7 @@ const Order = require("../models/Order");
 // / AWS_SESSION_TOKEN) or from the EKS pod IAM role — no explicit creds needed.
 const { SQSClient, SendMessageCommand } = require("@aws-sdk/client-sqs");
 
-const sqsClient = new SQSClient({ region: "us-east-1" });
+const sqsClient = new SQSClient({ region: process.env.AWS_REGION || "us-east-1" });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // [REPLACED] Old HTTP notification helper — kept for reference / rollback.

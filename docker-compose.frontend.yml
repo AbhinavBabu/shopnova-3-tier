@@ -1,0 +1,56 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# ShopNova — Frontend Docker Compose
+#
+# Deploy on the frontend EC2 (public subnet).
+#
+# The nginx container proxies /api/* to the internal ALB.
+# Point *_SERVICE_HOST vars at the internal ALB DNS name.
+# When the ALB routes by path prefix, all three hosts will be the SAME ALB
+# DNS and *_SERVICE_PORT will be 80.
+#
+# Usage:
+#   cp .env.frontend .env.frontend.local   # fill in real values
+#   docker compose -f docker-compose.frontend.yml --env-file .env.frontend.local up -d
+#
+# To rebuild the image with new VITE_* API base URLs (uncommon — needed only
+# when the React code should call backends directly, bypassing nginx):
+#   docker compose -f docker-compose.frontend.yml build \
+#     --build-arg VITE_AUTH_SERVICE_URL=http://<alb-dns> \
+#     --build-arg VITE_PRODUCT_SERVICE_URL=http://<alb-dns> \
+#     --build-arg VITE_ORDER_SERVICE_URL=http://<alb-dns>
+# ──────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── Frontend / nginx (port 3000) ─────────────────────────────────────────────
+  # Serves the React SPA and reverse-proxies /api/* to backend services via ALB.
+  frontend-service:
+    build:
+      context: ./services/frontend-service
+      dockerfile: Dockerfile
+      args:
+        # VITE_* vars are baked into the React bundle at build time.
+        # Leave empty (default) — nginx proxy_pass handles routing via ALB.
+        # Only set these if the browser must call backends directly.
+        VITE_AUTH_SERVICE_URL: ${VITE_AUTH_SERVICE_URL:-}
+        VITE_PRODUCT_SERVICE_URL: ${VITE_PRODUCT_SERVICE_URL:-}
+        VITE_ORDER_SERVICE_URL: ${VITE_ORDER_SERVICE_URL:-}
+    container_name: shopnova-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # ── nginx runtime routing (substituted into nginx.conf via envsubst) ──
+      # For ALB: set all three hosts to the internal ALB DNS name, ports to 80.
+      # For local simulation: set hosts to the backend EC2 IP, ports to service ports.
+      AUTH_SERVICE_HOST: ${AUTH_SERVICE_HOST}
+      AUTH_SERVICE_PORT: ${AUTH_SERVICE_PORT:-80}
+      PRODUCT_SERVICE_HOST: ${PRODUCT_SERVICE_HOST}
+      PRODUCT_SERVICE_PORT: ${PRODUCT_SERVICE_PORT:-80}
+      ORDER_SERVICE_HOST: ${ORDER_SERVICE_HOST}
+      ORDER_SERVICE_PORT: ${ORDER_SERVICE_PORT:-80}
+
+# ── Isolated bridge network for the frontend EC2 ─────────────────────────────
+networks:
+  default:
+    driver: bridge
